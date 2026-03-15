@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>View Auctions</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+
+body{
+background:#f4f6f9;
+font-family: Arial;
+}
+
+.navbar{
+background:#111;
+}
+
+table{
+background:white;
+}
+
+.bid-box{
+width:120px;
+}
+
+.highlight-row{
+background-color:#fff3cd !important;
+border:2px solid orange;
+font-weight:bold;
+}
+
+.badge{
+font-size:12px;
+}
+
+</style>
+
+</head>
+
+<body>
+{% if suspicious_user %}
+
+<div class="modal fade" id="warningModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">⚠ Suspicious Activity Detected</h5>
+      </div>
+
+      <div class="modal-body">
+
+        Your bidding activity appears suspicious.
+        Please avoid frequent or abnormal bids.
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-danger" data-bs-dismiss="modal">OK</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+<nav class="navbar navbar-dark">
+<div class="container">
+
+<span class="navbar-brand">Smart Auction System</span>
+
+<div>
+
+<a href="/" class="btn btn-outline-light me-2">Home</a>
+
+<a href="/dashboard" class="btn btn-outline-light me-2">Dashboard</a>
+
+{% if session.get('username') == 'admin' %}
+<a href="/admin" class="btn btn-warning me-2">Admin</a>
+{% endif %}
+
+<a href="/logout" class="btn btn-danger">Logout</a>
+
+</div>
+
+</div>
+</nav>
+
+
+<div class="container mt-5">
+
+<h3 class="text-center mb-4">Live Auctions</h3>
+
+<table class="table table-striped table-hover shadow">
+
+<thead class="table-dark">
+
+<tr>
+
+<th>ID</th>
+<th>Product</th>
+<th>Starting Price</th>
+<th>Current Price</th>
+<th>Duration</th>
+<th>Time Left</th>
+<th>Category</th>
+<th>Market Avg</th>
+<th>Highest Bidder</th>
+<th>Place Bid</th>
+<th>Delete</th>
+
+</tr>
+
+</thead>
+
+
+<tbody>
+
+{% for auction in auctions %}
+
+<tr class="{% if highlight_id and highlight_id|int == auction[0] %}highlight-row{% endif %}">
+
+<td>{{ auction[0] }}</td>
+
+<td>{{ auction[1] }}</td>
+
+<td>₹ {{ auction[2] }}</td>
+
+<td>₹ {{ auction[3] }}</td>
+
+<td>{{ auction[4] }} days</td>
+
+
+<td>
+<span class="timer" data-duration="{{ auction[4] }}"></span>
+</td>
+
+
+<td>
+
+{% if auction[5] == 1 or auction[5] == "1" %}
+Electronics
+{% elif auction[5] == 2 or auction[5] == "2" %}
+Furniture
+{% elif auction[5] == 3 or auction[5] == "3" %}
+Vehicle
+{% elif auction[5] == 4 or auction[5] == "4" %}
+Real Estate
+{% elif auction[5] == 5 or auction[5] == "5" %}
+Antiques
+{% else %}
+{{ auction[5] }}
+{% endif %}
+
+</td>
+
+
+<td>₹ {{ auction[6] }}</td>
+
+
+<td>
+
+<span class="highest-bidder">{{ auction[7] }}</span>
+
+{% if auction[7] == username %}
+<span class="badge bg-success ms-2">You are winning</span>
+{% endif %}
+
+</td>
+
+
+<td>
+
+<div class="bid-section">
+
+<form action="/place_bid" method="POST" class="d-flex">
+
+<input type="hidden" name="auction_id" value="{{ auction[0] }}">
+
+<input 
+type="number"
+name="bid_amount"
+class="form-control bid-box me-2"
+placeholder="Enter bid"
+required
+>
+
+<button class="btn btn-success btn-sm">
+Bid
+</button>
+
+</form>
+
+</div>
+
+</td>
+
+
+<td>
+
+<a href="/delete_auction/{{ auction[0] }}"
+class="btn btn-danger btn-sm"
+onclick="return confirm('Delete this auction?')">
+
+Delete
+
+</a>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+
+<script>
+
+document.querySelectorAll(".timer").forEach(function(el){
+
+let days = parseInt(el.dataset.duration)
+let seconds = days * 86400
+
+let row = el.closest("tr")
+let bidSection = row.querySelector(".bid-section")
+let bidder = row.querySelector(".highest-bidder")
+
+setInterval(function(){
+
+if(seconds > 0){
+
+seconds--
+
+let h = Math.floor(seconds/3600)
+let m = Math.floor((seconds%3600)/60)
+let s = seconds%60
+
+el.innerHTML = h+"h "+m+"m "+s+"s"
+
+}
+else{
+
+el.innerHTML = "Auction Ended"
+
+if(bidSection){
+bidSection.innerHTML = ""
+}
+
+if(bidder && bidder.innerText !== "No bids yet"){
+bidder.innerHTML = bidder.innerText + " 🏆 Winner"
+}
+
+}
+
+},1000)
+
+})
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+{% if suspicious_user %}
+<script>
+
+var warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+warningModal.show();
+
+</script>
+{% endif %}
+
+
+</body>
+</html>

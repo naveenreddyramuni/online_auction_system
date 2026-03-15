@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Create Auction</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+
+body{
+background: linear-gradient(135deg,#4facfe,#00f2fe);
+font-family: Arial;
+min-height:100vh;
+}
+
+.navbar{
+background:#111;
+}
+
+.auction-card{
+background:white;
+border-radius:15px;
+padding:35px;
+box-shadow:0px 8px 20px rgba(0,0,0,0.25);
+}
+
+.auction-card h3{
+font-weight:700;
+color:#333;
+}
+
+.form-label{
+font-weight:600;
+color:#555;
+}
+
+.form-control:focus{
+border-color:#4facfe;
+box-shadow:0 0 5px #4facfe;
+}
+
+.btn-create{
+background:linear-gradient(90deg,#667eea,#764ba2);
+color:white;
+font-weight:600;
+border:none;
+}
+
+.btn-create:hover{
+background:linear-gradient(90deg,#5a6fd8,#6c3f96);
+}
+
+.icon{
+color:#667eea;
+margin-right:6px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark">
+<div class="container">
+
+<span class="navbar-brand">
+<i class="fa-solid fa-gavel"></i> Smart Auction System
+</span>
+
+<div>
+<a href="/" class="btn btn-outline-light me-2">Home</a>
+<a href="/dashboard" class="btn btn-outline-light me-2">Dashboard</a>
+<a href="/logout" class="btn btn-danger">Logout</a>
+</div>
+
+</div>
+</nav>
+
+
+<div class="container mt-5">
+
+<div class="col-md-6 mx-auto auction-card">
+
+<h3 class="text-center mb-4">
+<i class="fa-solid fa-plus"></i> Create New Auction
+</h3>
+
+<form method="POST">
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-box icon"></i> Product Name
+</label>
+
+<input type="text" name="product_name" class="form-control" required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-indian-rupee-sign icon"></i> Starting Price
+</label>
+
+<input type="number" name="starting_price" class="form-control" required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-chart-line icon"></i> Market Average Price
+</label>
+
+<input type="number" name="market_avg" class="form-control" required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-star icon"></i> Seller Rating
+</label>
+
+<input type="number" step="0.1" min="1" max="5" name="seller_rating" class="form-control" required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-clock icon"></i> Auction Duration (Days)
+</label>
+
+<input type="number" name="duration" class="form-control" required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-users icon"></i> Expected Bid Count
+</label>
+
+<input type="number" name="bid_count" class="form-control">
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-layer-group icon"></i> Category
+</label>
+
+<select name="category" class="form-control">
+
+<option value="Electronics">Electronics</option>
+<option value="Furniture">Furniture</option>
+<option value="Vehicle">Vehicle</option>
+<option value="Real Estate">Real Estate</option>
+<option value="Antiques">Antiques</option>
+
+</select>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-fire icon"></i> Popularity
+</label>
+
+<select name="popularity" class="form-control">
+
+<option value="0.8">Low Demand</option>
+<option value="1">Normal Demand</option>
+<option value="1.2">High Demand</option>
+
+</select>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+<i class="fa-solid fa-circle-check icon"></i> Product Condition
+</label>
+
+<select name="condition_score" class="form-control">
+
+<option value="0.8">Used</option>
+<option value="1">Good</option>
+<option value="1.2">Excellent</option>
+
+</select>
+
+</div>
+
+
+<div class="d-grid mt-4">
+
+<button class="btn btn-create btn-lg">
+
+<i class="fa-solid fa-chart-simple"></i> Predict Price & Create Auction
+
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+</body>
+</html>

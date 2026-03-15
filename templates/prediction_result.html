@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prediction Result</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: linear-gradient(135deg, #43cea2, #185a9d);
+            margin: 0;
+            color: white;
+            text-align: center;
+        }
+
+        .box {
+            margin: 120px auto;
+            width: 400px;
+            padding: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border: none;
+            background: orange;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #ffb347;
+        }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Predicted Final Price</h2>
+    <h1>₹ {{ predicted_price }}</h1>
+
+    <a href="/create_auction">
+        <button>Create Another Auction</button>
+    </a>
+</div>
+
+</body>
+</html>

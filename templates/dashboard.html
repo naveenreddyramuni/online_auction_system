@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dashboard</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+
+body{
+background: linear-gradient(to right,#1d4350,#a43931);
+color:white;
+font-family: Arial;
+}
+
+.navbar{
+background:#111;
+}
+
+.dashboard-container{
+margin-top:40px;
+}
+
+.card{
+border-radius:15px;
+transition:0.3s;
+}
+
+.card:hover{
+transform:scale(1.05);
+}
+
+.auction-img{
+height:200px;
+object-fit:cover;
+border-top-left-radius:15px;
+border-top-right-radius:15px;
+}
+
+.welcome{
+text-align:center;
+margin-bottom:30px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<!-- Navbar -->
+
+<nav class="navbar navbar-dark">
+<div class="container">
+
+<span class="navbar-brand">Smart Auction System</span>
+
+<div>
+
+<a href="/" class="btn btn-outline-light me-2">Home</a>
+<a href="/register" class="btn btn-outline-light me-2">Register</a>
+<a href="/login" class="btn btn-outline-light me-2">Login</a>
+<a href="/dashboard" class="btn btn-outline-light me-2">Dashboard</a>
+<a href="/logout" class="btn btn-danger">Logout</a>
+
+</div>
+
+</div>
+</nav>
+
+
+<!-- Dashboard Content -->
+
+<div class="container dashboard-container">
+
+<div class="welcome">
+<h2>Welcome {{ username }}</h2>
+<p>Manage your auctions easily</p>
+</div>
+
+
+<div class="row g-4">
+
+<!-- Create Auction -->
+
+<div class="col-md-6">
+
+<div class="card shadow">
+
+<img src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da" class="auction-img">
+
+<div class="card-body text-center">
+
+<h4>Create New Auction</h4>
+
+<p>Create auctions and predict the final price using AI.</p>
+
+<a href="/create_auction" class="btn btn-success">Create Auction</a>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- View Auctions -->
+
+<div class="col-md-6">
+
+<div class="card shadow">
+
+<img src="https://images.unsplash.com/photo-1515168833906-d2a3b82b302a" class="auction-img">
+
+<div class="card-body text-center">
+
+<h4>View Auctions</h4>
+
+<p>See all running auctions and their details.</p>
+
+<a href="/view_auctions" class="btn btn-primary">View Auctions</a>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>

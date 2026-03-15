@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>Auction Details</h2>
+
+<p><b>Product:</b> {{ auction[1] }}</p>
+<p><b>Current Price:</b> ₹ {{ auction[3] }}</p>
+
+<h3>Place Bid</h3>
+
+<form method="POST">
+    <input type="number" name="bid_amount" required>
+    <button type="submit">Place Bid</button>
+</form>
+
+<br>
+
+<!-- 🔥 Message display -->
+{% if message %}
+    <h3 style="color:red;">{{ message }}</h3>
+{% endif %}
+
+{% endblock %}
+
+{% if message %}
+<div style="
+    padding:10px;
+    border-radius:5px;
+    background-color:#fff3cd;
+    color:#856404;
+    width:350px;
+">
+    {{ message }}
+</div>
+{% endif %}
+
+
