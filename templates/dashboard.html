@@ -47,7 +47,6 @@ margin-bottom:30px;
 </head>
 
 <body>
-
 <!-- Navbar -->
 
 <nav class="navbar navbar-dark">
@@ -58,10 +57,18 @@ margin-bottom:30px;
 <div>
 
 <a href="/" class="btn btn-outline-light me-2">Home</a>
-<a href="/register" class="btn btn-outline-light me-2">Register</a>
-<a href="/login" class="btn btn-outline-light me-2">Login</a>
-<a href="/dashboard" class="btn btn-outline-light me-2">Dashboard</a>
-<a href="/logout" class="btn btn-danger">Logout</a>
+
+{% if not session.get('username') %}
+    <!-- Before login -->
+    <a href="/register" class="btn btn-outline-light me-2">Register</a>
+    <a href="/login" class="btn btn-outline-light me-2">Login</a>
+{% endif %}
+
+{% if session.get('username') %}
+    <!-- After login -->
+    <a href="/dashboard" class="btn btn-outline-light me-2">Dashboard</a>
+    <a href="/logout" class="btn btn-danger">Logout</a>
+{% endif %}
 
 </div>
 
