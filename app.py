@@ -7,6 +7,7 @@ import smtplib
 import random
 from email.mime.text import MIMEText
 from flask import session
+from flask import redirect, url_for
 
 import joblib
 
@@ -15,7 +16,9 @@ price_model = joblib.load("model/price_model.pkl")
 category_encoder = joblib.load("model/category_encoder.pkl")
 
 app = Flask(__name__)
-app.secret_key = "auction_secret_key"
+app.secret_key = 'super_secret_key'
+
+app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(minutes=10)
 
 conn = sqlite3.connect('database/auction.db')
 cur = conn.cursor()
@@ -61,13 +64,14 @@ def register():
         otp = random.randint(100000,999999)
 
         print("OTP for verification:", otp)
+        send_otp(email, otp) 
 
         session['otp'] = str(otp)
         session['username'] = username
         session['email'] = email
         session['password'] = password
 
-        return redirect('/verify_otp')
+        return redirect('/verify_page')
 
     return render_template('register.html')
 
@@ -283,51 +287,51 @@ def place_bid():
         conn.close()
         return "Bid must be higher than current price"
 
-
     suspicious = False
     warning_message = None
 
 
-    # RULE 1: Bid greater than 3× current price
+# RULE 1: Bid greater than 3× current price
     if bid_amount > current_price * 3:
         suspicious = True
         warning_message = "⚠ Suspicious Activity: Bid too high compared to current price."
 
 
-    # RULE 2: Abnormal jump compared to last bid
-    cur.execute("""
-    SELECT bid_amount FROM bids
-    WHERE auction_id=?
-    ORDER BY bid_time DESC
-    LIMIT 1
-    """, (auction_id,))
+# RULE 2: Abnormal jump compared to last bid
+    if not suspicious:
+        cur.execute("""
+        SELECT bid_amount FROM bids
+        WHERE auction_id=?
+        ORDER BY bid_time DESC
+        LIMIT 1
+        """, (auction_id,))
 
-    last_bid = cur.fetchone()
+        last_bid = cur.fetchone()
 
-    if last_bid:
-        if bid_amount > last_bid[0] * 2:
+        if last_bid:
+            if bid_amount > last_bid[0] * 2:
+                suspicious = True
+                warning_message = "⚠ Suspicious Activity: Abnormal bid jump detected."
+
+
+# RULE 3: 5 bids within 1 minute
+    if not suspicious:
+        cur.execute("""
+        SELECT COUNT(*) FROM bids
+        WHERE username=? AND bid_time > datetime('now','-1 minute')
+        """,(username,))
+
+        recent_bid_count = cur.fetchone()[0]
+
+        if recent_bid_count >= 5:
             suspicious = True
-            warning_message = "⚠ Suspicious Activity: Abnormal bid jump detected."
+            warning_message = "⚠ Suspicious Activity: Too many bids within 1 minute."
 
 
-    # RULE 3: 5 bids within 1 minute
-    cur.execute("""
-    SELECT COUNT(*) FROM bids
-    WHERE username=? AND bid_time > datetime('now','-1 minute')
-    """,(username,))
-
-    recent_bid_count = cur.fetchone()[0]
-
-    if recent_bid_count >= 5:
-        suspicious = True
-        warning_message = "⚠ Suspicious Activity: Too many bids within 1 minute."
-
-
-    # If suspicious → reject bid
+# ✅ FINAL CHECK (OUTSIDE ALL RULES)
     if suspicious:
         conn.close()
         return warning_message
-
 
     # Normal bid → insert bid
     cur.execute("""
@@ -438,58 +442,95 @@ def delete_auction(auction_id):
 
     return redirect('/view_auctions')
 
-def send_otp_email(receiver_email, otp):
+from flask import Flask, render_template, request, session
+from flask_mail import Mail, Message
+import random
+import datetime
 
-    sender_email = "yourgmail@gmail.com"
-    sender_password = "your_app_password"
+#app = Flask(__name__)
+#app.secret_key = 'secret123'
 
-    subject = "Auction System OTP Verification"
+# ✅ Gmail SMTP (App Password required)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'naveenreddyramuni@gmail.com'      # 🔁 replace
+app.config['MAIL_PASSWORD'] = 'duxgbofpbkwyojzz'         # 🔁 replace
 
-    body = f"Your OTP for registration is: {otp}"
+mail = Mail(app)
 
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = sender_email
-    msg['To'] = receiver_email
+# 🔢 Generate OTP
+def generate_otp():
+    return str(random.randint(100000, 999999))
 
-    server = smtplib.SMTP("smtp.gmail.com", 587)
-    server.starttls()
-    server.login(sender_email, sender_password)
-    server.send_message(msg)
-    server.quit()
+# 📧 Send OTP
+def send_otp(email, otp):
+    try:
+        msg = Message('OTP Verification',
+                      sender=app.config['MAIL_USERNAME'],
+                      recipients=[email])
+        msg.body = f'Your OTP is: {otp}'
+
+        mail.send(msg)
+        print("Email sent successfully ✅")
+
+    except Exception as e:
+        print("Email sending failed ❌:", e)
+
+# 🏠 MAIN PAGE (your existing page — DO NOT CHANGE)
+#@app.route('/')
+#def home():
+    #return render_template('home.html')
+
+# 🔐 OTP PAGE (new page)
+@app.route('/otp')
+def otp_page():
+    return render_template('index.html')
+
+# 📤 SEND OTP (POST only)
+@app.route('/send_otp', methods=['POST'])
+def send_otp(email, otp):
+    try:
+        msg = Message(
+            'OTP Verification',
+            sender=app.config['MAIL_USERNAME'],
+            recipients=[email]
+        )
+        msg.body = f'Your OTP is: {otp}'
+
+        mail.send(msg)
+        print("Email sent successfully ✅")
+
+    except Exception as e:
+        print("Email sending failed ❌:", e)
 
 
-@app.route('/verify_otp', methods=['GET','POST'])
+@app.route('/verify_otp', methods=['POST'])
 def verify_otp():
+    if request.method != 'POST':
+        return "Invalid access ❌ Use the form"
 
-    if request.method == 'POST':
+    if 'otp' not in session:
+        return "Session expired. Please request OTP again ❌"
 
-        user_otp = request.form['otp']
+    user_otp = request.form['otp']
+    stored_otp = session['otp']
 
-        if user_otp == session.get('otp'):
+    if user_otp == stored_otp:
+        session.pop('otp', None)
+        session.pop('otp_expiry', None)
+        return redirect(url_for('login'))
+    else:
+        return "Invalid OTP ❌"
 
-            conn = sqlite3.connect('database/auction.db')
-            cur = conn.cursor()
+@app.route('/verify_page')
+def verify_page():
+    print("SESSION:", session)   # 👈 check this
 
-            cur.execute("""
-            INSERT INTO users(username,email,password)
-            VALUES(?,?,?)
-            """,(
-            session['username'],
-            session['email'],
-            session['password']
-            ))
+    if 'otp' not in session:
+        return "Please request OTP first ❌"
 
-            conn.commit()
-            conn.close()
-
-            return redirect('/login')
-
-        else:
-            return "Invalid OTP"
-
-    return render_template('verify_otp.html')
-    
+    return render_template('verify.html')
 
 import sqlite3
 
@@ -629,4 +670,4 @@ conn.close()
 # ---------------- RUN ---------------- #
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
