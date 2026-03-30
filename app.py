@@ -167,65 +167,90 @@ def logout():
 @app.route('/create_auction', methods=['GET','POST'])
 def create_auction():
 
-    import datetime
-    import sqlite3
-    import pickle
+    if 'username' not in session:
+        return redirect('/login')
 
     if request.method == 'POST':
 
         product_name = request.form['product_name']
         starting_price = float(request.form['starting_price'])
         duration = int(request.form['duration'])
-        category_text = request.form['category']
-
-        category_map = {
-            "Electronics": 1,
-            "Furniture": 2,
-            "Vehicle": 3,
-            "Real Estate": 4,
-            "Antiques": 5
-        }
-
-        category = category_map.get(category_text, 0)
+        category = request.form['category']
         market_avg = float(request.form['market_avg'])
+        seller_rating = float(request.form['seller_rating'])
 
-        # 🔥 PREDICT PRICE BEFORE INSERT
-        try:
-            model = pickle.load(open('model.pkl', 'rb'))
-            predicted_price = model.predict([[starting_price, category, market_avg]])[0]
-        except:
-            predicted_price = market_avg   # fallback
+        # initial auction state
+        bid_count = 0
 
+        # encode category for ML model
+        category_encoded = category_encoder.transform([category])[0]
+
+        # default feature assumptions
+        popularity = 1
+        condition_score = 1
+
+        # ML feature vector
+        features = [[
+            starting_price,
+            market_avg,
+            seller_rating,
+            bid_count,
+            duration,
+            category_encoded,
+            popularity,
+            condition_score
+        ]]
+
+        # ML model prediction
+        ml_price = price_model.predict(features)[0]
+
+        # rule-based market estimate
+        market_factor = (
+            starting_price * 0.4 +
+            market_avg * 0.4 +
+            seller_rating * 300 +
+            duration * 200
+        )
+
+        # demand factor
+        demand_boost = bid_count * 150
+
+        # hybrid final prediction
+        predicted_price = (ml_price * 0.6) + (market_factor * 0.4) + demand_boost
+
+        predicted_price = round(predicted_price,2)
+
+        # auction end time
         start_time = datetime.datetime.now()
-        end_time = start_time + datetime.timedelta(days=duration)
+        end_time = start_time + datetime.timedelta(days=int(duration))
 
         conn = sqlite3.connect('database/auction.db')
         cur = conn.cursor()
 
         cur.execute("""
-        INSERT INTO auctions 
-        (product_name, starting_price, current_price, duration, category, market_avg, predicted_price, highest_bidder, end_time, email_sent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        INSERT INTO auctions
+        (product_name, starting_price, current_price, duration, category, market_avg, end_time, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,(
             product_name,
             starting_price,
             starting_price,
             duration,
             category,
             market_avg,
-            float(predicted_price),   # ✅ STORED HERE
-            "No bids yet",
             end_time,
-            0
+            session['username']
         ))
 
         conn.commit()
         conn.close()
 
-        return render_template('prediction_result.html', predicted_price=predicted_price)
+        return render_template(
+            "prediction_result.html",
+            predicted_price=predicted_price
+        )
 
-    return render_template('create_auction.html')
-
+    return render_template("create_auction.html")
 
 
 
@@ -777,5 +802,4 @@ conn.close()
 # ---------------- RUN ---------------- #
 
 if __name__ == "__main__":
-    import os
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True)
