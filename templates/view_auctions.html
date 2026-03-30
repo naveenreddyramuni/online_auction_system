@@ -135,7 +135,7 @@ font-size:12px;
 
 
 <td>
-<span class="timer" data-duration="{{ auction[4] }}"></span>
+<span class="timer" data-end="{{ auction[8] }}"></span>
 </td>
 
 
@@ -163,9 +163,11 @@ Antiques
 
 <td>
 
-<span class="highest-bidder">{{ auction[7] }}</span>
+<span class="highest-bidder">
+    {{ auction[10] if auction[10] else "No bids yet" }}
+</span>
 
-{% if auction[7] == username %}
+{% if auction[10] == username %}
 <span class="badge bg-success ms-2">You are winning</span>
 {% endif %}
 
@@ -226,55 +228,55 @@ Delete
 
 document.querySelectorAll(".timer").forEach(function(el){
 
-let days = parseInt(el.dataset.duration)
-let seconds = days * 86400
+let endTimeStr = el.dataset.end;
 
-let row = el.closest("tr")
-let bidSection = row.querySelector(".bid-section")
-let bidder = row.querySelector(".highest-bidder")
-
-setInterval(function(){
-
-if(seconds > 0){
-
-seconds--
-
-let h = Math.floor(seconds/3600)
-let m = Math.floor((seconds%3600)/60)
-let s = seconds%60
-
-el.innerHTML = h+"h "+m+"m "+s+"s"
-
+if(!endTimeStr){
+    el.innerHTML = "No Time";
+    return;
 }
-else{
 
-el.innerHTML = "Auction Ended"
+let endTime = new Date(endTimeStr.replace(" ", "T")).getTime();
+
+let row = el.closest("tr");
+let bidSection = row.querySelector(".bid-section");
+let bidder = row.querySelector(".highest-bidder");
+
+function updateTimer(){
+
+let now = new Date().getTime();
+let diff = endTime - now;
+
+if(diff > 0){
+
+let days = Math.floor(diff / (1000*60*60*24));
+let hours = Math.floor((diff / (1000*60*60)) % 24);
+let minutes = Math.floor((diff / (1000*60)) % 60);
+let seconds = Math.floor((diff / 1000) % 60);
+
+el.innerHTML = days+"d "+hours+"h "+minutes+"m "+seconds+"s";
+
+}else{
+
+el.innerHTML = "Auction Ended";
 
 if(bidSection){
-bidSection.innerHTML = ""
+    bidSection.innerHTML = "";
 }
 
-if(bidder && bidder.innerText !== "No bids yet"){
-bidder.innerHTML = bidder.innerText + " 🏆 Winner"
+if(!bidder.innerText.includes("Winner")){
+    bidder.innerHTML = bidder.innerText + " 🏆 Winner";
 }
 
 }
 
-},1000)
+}
 
-})
+updateTimer();
+setInterval(updateTimer, 1000);
+
+});
 
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-{% if suspicious_user %}
-<script>
-
-var warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
-warningModal.show();
-
-</script>
-{% endif %}
 
 
 </body>
