@@ -9,6 +9,7 @@ from flask_mail import Mail, Message
 from flask import session
 from flask import redirect, url_for
 from flask import request
+import os
 
 import joblib
 
@@ -72,33 +73,44 @@ def is_valid_password(password):
 # ---------------- REGISTER ---------------- #
 
 import random
-
-@app.route('/register', methods=['GET','POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
+    import sqlite3
+    import os
 
     if request.method == 'POST':
+        try:
+            username = request.form.get('username')
+            email = request.form.get('email')
+            password = request.form.get('password')
 
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
+            # ✅ DB path fix
+            db_path = os.path.join(os.path.dirname(__file__), 'database/auction.db')
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
 
-        # ✅ STEP 2: ADD PASSWORD VALIDATION HERE
-        error = is_valid_password(password)
-        if error:
-            return error   # or render_template('register.html', error=error)
+            # ✅ Check duplicate email
+            cur.execute("SELECT * FROM users WHERE email=?", (email,))
+            if cur.fetchone():
+                return "Email already registered!"
 
-        # 🔽 OTP logic (keep same)
-        otp = random.randint(100000,999999)
+            # ✅ Insert user
+            cur.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+                        (username, email, password))
 
-        print("OTP for verification:", otp)
-        send_otp(email, otp) 
+            conn.commit()
+            conn.close()
 
-        session['otp'] = str(otp)
-        session['username'] = username
-        session['email'] = email
-        session['password'] = password
+            # ❌ Disable email temporarily
+            # mail.send(msg)
 
-        return redirect('/verify_page')
+            print("User Registered:", email)
+
+            return "Registration Successful!"
+
+        except Exception as e:
+            print("REGISTER ERROR:", e)
+            return str(e)
 
     return render_template('register.html')
 

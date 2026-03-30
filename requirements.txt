@@ -1,6 +1,6 @@
 Flask
+Flask-Mail
 gunicorn
 numpy
 scikit-learn
 joblib
-Flask-Mail
