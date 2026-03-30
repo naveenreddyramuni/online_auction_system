@@ -5,14 +5,14 @@ import numpy as np
 import datetime
 import smtplib
 import random
-from email.mime.text import MIMEText
+from flask_mail import Mail, Message
 from flask import session
 from flask import redirect, url_for
+from flask import request
 
 import joblib
 
 price_model = joblib.load("model/price_model.pkl")
-
 category_encoder = joblib.load("model/category_encoder.pkl")
 
 app = Flask(__name__)
@@ -48,6 +48,27 @@ def home():
     return render_template('home.html')
 
 
+import re
+
+def is_valid_password(password):
+    if len(password) < 8:
+        return "Password must be at least 8 characters"
+
+    if not re.search(r"[A-Z]", password):
+        return "Password must contain at least one uppercase letter"
+
+    if not re.search(r"[a-z]", password):
+        return "Password must contain at least one lowercase letter"
+
+    if not re.search(r"[0-9]", password):
+        return "Password must contain at least one number"
+
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return "Password must contain at least one special character"
+
+    return None
+
+
 # ---------------- REGISTER ---------------- #
 
 import random
@@ -61,6 +82,12 @@ def register():
         email = request.form['email']
         password = request.form['password']
 
+        # ✅ STEP 2: ADD PASSWORD VALIDATION HERE
+        error = is_valid_password(password)
+        if error:
+            return error   # or render_template('register.html', error=error)
+
+        # 🔽 OTP logic (keep same)
         otp = random.randint(100000,999999)
 
         print("OTP for verification:", otp)
@@ -74,6 +101,16 @@ def register():
         return redirect('/verify_page')
 
     return render_template('register.html')
+
+
+def send_winner_email(to_email, auction_title, amount):
+    msg = Message(
+        'Auction Won!',
+        sender=app.config['MAIL_USERNAME'],
+        recipients=[to_email]
+    )
+    msg.body = f"You won {auction_title} for ₹{amount}"
+    mail.send(msg)
 
 
 # ---------------- LOGIN ---------------- #
@@ -127,134 +164,141 @@ def logout():
 
 
 # ---------------- CREATE AUCTION + ML ---------------- #
-
 @app.route('/create_auction', methods=['GET','POST'])
 def create_auction():
 
-    if 'username' not in session:
-        return redirect('/login')
+    import datetime
+    import sqlite3
+    import pickle
 
     if request.method == 'POST':
 
         product_name = request.form['product_name']
         starting_price = float(request.form['starting_price'])
         duration = int(request.form['duration'])
-        category = request.form['category']
+        category_text = request.form['category']
+
+        category_map = {
+            "Electronics": 1,
+            "Furniture": 2,
+            "Vehicle": 3,
+            "Real Estate": 4,
+            "Antiques": 5
+        }
+
+        category = category_map.get(category_text, 0)
         market_avg = float(request.form['market_avg'])
-        seller_rating = float(request.form['seller_rating'])
 
-        # initial auction state
-        bid_count = 0
+        # 🔥 PREDICT PRICE BEFORE INSERT
+        try:
+            model = pickle.load(open('model.pkl', 'rb'))
+            predicted_price = model.predict([[starting_price, category, market_avg]])[0]
+        except:
+            predicted_price = market_avg   # fallback
 
-        # encode category for ML model
-        category_encoded = category_encoder.transform([category])[0]
-
-        # default feature assumptions
-        popularity = 1
-        condition_score = 1
-
-        # ML feature vector
-        features = [[
-            starting_price,
-            market_avg,
-            seller_rating,
-            bid_count,
-            duration,
-            category_encoded,
-            popularity,
-            condition_score
-        ]]
-
-        # ML model prediction
-        ml_price = price_model.predict(features)[0]
-
-        # rule-based market estimate
-        market_factor = (
-            starting_price * 0.4 +
-            market_avg * 0.4 +
-            seller_rating * 300 +
-            duration * 200
-        )
-
-        # demand factor
-        demand_boost = bid_count * 150
-
-        # hybrid final prediction
-        predicted_price = (ml_price * 0.6) + (market_factor * 0.4) + demand_boost
-
-        predicted_price = round(predicted_price,2)
-
-        # auction end time
-        end_time = datetime.datetime.now() + datetime.timedelta(days=duration)
+        start_time = datetime.datetime.now()
+        end_time = start_time + datetime.timedelta(days=duration)
 
         conn = sqlite3.connect('database/auction.db')
         cur = conn.cursor()
 
         cur.execute("""
-        INSERT INTO auctions
-        (product_name, starting_price, current_price, duration, category, market_avg, end_time, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,(
+        INSERT INTO auctions 
+        (product_name, starting_price, current_price, duration, category, market_avg, predicted_price, highest_bidder, end_time, email_sent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
             product_name,
             starting_price,
             starting_price,
             duration,
             category,
             market_avg,
+            float(predicted_price),   # ✅ STORED HERE
+            "No bids yet",
             end_time,
-            session['username']
+            0
         ))
 
         conn.commit()
         conn.close()
 
-        return render_template(
-            "prediction_result.html",
-            predicted_price=predicted_price
-        )
+        return render_template('prediction_result.html', predicted_price=predicted_price)
 
-    return render_template("create_auction.html")
+    return render_template('create_auction.html')
+
+
+
+
+
+
+
 # ---------------- VIEW AUCTIONS ---------------- #
 
 @app.route('/view_auctions')
 def view_auctions():
 
-    if 'username' not in session:
-        return redirect('/login')
+    import datetime
+    import sqlite3
+    from flask import request   # ✅ ADDED (important for highlight)
 
     conn = sqlite3.connect('database/auction.db')
     cur = conn.cursor()
 
-    cur.execute("""
-    SELECT a.id,
-           a.product_name,
-           a.starting_price,
-           a.current_price,
-           a.duration,
-           a.category,
-           a.market_avg,
-           COALESCE(
-               (SELECT username
-                FROM bids
-                WHERE auction_id = a.id
-                ORDER BY bid_amount DESC
-                LIMIT 1),
-               'No bids yet'
-           ) AS highest_bidder
-    FROM auctions a
-    """)
-
+    cur.execute("SELECT * FROM auctions")
     auctions = cur.fetchall()
+
+    highlight_id = request.args.get('highlight_id')
+
+    for auction in auctions:
+
+        try:
+            end_time_value = auction[8]
+
+            if end_time_value is None:
+                continue
+
+            if isinstance(end_time_value, str):
+                end_time = datetime.datetime.fromisoformat(end_time_value)
+            else:
+                end_time = end_time_value
+
+            remaining = end_time - datetime.datetime.now()
+
+            if remaining.total_seconds() <= 0:
+
+                cur.execute("""
+                SELECT highest_bidder, current_price, product_name, email_sent
+                FROM auctions WHERE id=?
+                """, (auction[0],))
+
+                result = cur.fetchone()
+
+                # ✅ ONLY SEND IF NOT SENT BEFORE
+                if result and result[0] != "No bids yet" and result[3] == 0:
+
+                    winner = result[0]
+                    amount = result[1]
+                    title = result[2]
+
+                    # ✅ GET WINNER EMAIL
+                    cur.execute("SELECT email FROM users WHERE username=?", (winner,))
+                    user = cur.fetchone()
+
+                    if user:
+                        print(f"Sending email to {user[0]} for auction {title}")  # ✅ DEBUG
+
+                        send_winner_email(user[0], title, amount)
+
+                        # ✅ MARK EMAIL SENT
+                        cur.execute("UPDATE auctions SET email_sent=1 WHERE id=?", (auction[0],))
+                        conn.commit()
+
+        except Exception as e:
+            print("Error:", e)
 
     conn.close()
 
-    return render_template(
-        "view_auctions.html",
-        auctions=auctions,
-        username=session['username']
-    )
-    
-
+    return render_template("view_auctions.html", auctions=auctions, highlight_id=highlight_id)
 
 @app.route('/place_bid', methods=['POST'])
 def place_bid():
@@ -291,13 +335,13 @@ def place_bid():
     warning_message = None
 
 
-# RULE 1: Bid greater than 3× current price
+    # RULE 1: Bid greater than 3× current price
     if bid_amount > current_price * 3:
         suspicious = True
         warning_message = "⚠ Suspicious Activity: Bid too high compared to current price."
 
 
-# RULE 2: Abnormal jump compared to last bid
+    # RULE 2: Abnormal jump compared to last bid
     if not suspicious:
         cur.execute("""
         SELECT bid_amount FROM bids
@@ -314,7 +358,7 @@ def place_bid():
                 warning_message = "⚠ Suspicious Activity: Abnormal bid jump detected."
 
 
-# RULE 3: 5 bids within 1 minute
+    # RULE 3: 5 bids within 1 minute
     if not suspicious:
         cur.execute("""
         SELECT COUNT(*) FROM bids
@@ -328,30 +372,32 @@ def place_bid():
             warning_message = "⚠ Suspicious Activity: Too many bids within 1 minute."
 
 
-# ✅ FINAL CHECK (OUTSIDE ALL RULES)
+    # FINAL CHECK
     if suspicious:
         conn.close()
         return warning_message
 
-    # Normal bid → insert bid
+
+    # ✅ INSERT BID
     cur.execute("""
     INSERT INTO bids (auction_id, username, bid_amount, bid_time)
     VALUES (?, ?, ?, ?)
     """,(auction_id, username, bid_amount, datetime.datetime.now()))
 
 
-    # Update auction price
+    # ✅ UPDATE PRICE + HIGHEST BIDDER (MAIN FIX)
     cur.execute("""
     UPDATE auctions
-    SET current_price=?, highest_bidder=?
-    WHERE id=?
+    SET current_price = ?, highest_bidder = ?
+    WHERE id = ?
     """,(bid_amount, username, auction_id))
 
 
+    # ✅ COMMIT (VERY IMPORTANT)
     conn.commit()
     conn.close()
 
-    return redirect('/view_auctions')
+    return redirect(f'/view_auctions?highlight_id={auction_id}')
 
 # ---------------- AUCTION DETAIL + BID ---------------- #
 
@@ -466,9 +512,11 @@ def generate_otp():
 # 📧 Send OTP
 def send_otp(email, otp):
     try:
-        msg = Message('OTP Verification',
-                      sender=app.config['MAIL_USERNAME'],
-                      recipients=[email])
+        msg = Message(
+            'OTP Verification',
+            sender=app.config['MAIL_USERNAME'],
+            recipients=[email]
+        )
         msg.body = f'Your OTP is: {otp}'
 
         mail.send(msg)
@@ -488,40 +536,80 @@ def otp_page():
     return render_template('index.html')
 
 # 📤 SEND OTP (POST only)
-@app.route('/send_otp', methods=['POST'])
-def send_otp(email, otp):
+
+
+def send_winner_email(to_email, auction_title, amount):
     try:
         msg = Message(
-            'OTP Verification',
+            subject="🎉 Congratulations! You Won the Auction",
             sender=app.config['MAIL_USERNAME'],
-            recipients=[email]
+            recipients=[to_email]
         )
-        msg.body = f'Your OTP is: {otp}'
+
+        msg.body = f"""
+Congratulations! 🎉
+
+You have successfully won the auction: {auction_title}
+
+Winning Amount: ₹{amount}
+
+Please login to your account for further details.
+
+Thank you for using Smart Auction System 🚀
+        """
 
         mail.send(msg)
-        print("Email sent successfully ✅")
+        print("Winner email sent successfully ✅")
 
     except Exception as e:
-        print("Email sending failed ❌:", e)
+        print("Email error ❌:", e)
 
 
 @app.route('/verify_otp', methods=['POST'])
 def verify_otp():
-    if request.method != 'POST':
-        return "Invalid access ❌ Use the form"
+
+    import datetime
+    import sqlite3
 
     if 'otp' not in session:
-        return "Session expired. Please request OTP again ❌"
+        return "Session expired ❌"
 
     user_otp = request.form['otp']
     stored_otp = session['otp']
 
-    if user_otp == stored_otp:
-        session.pop('otp', None)
-        session.pop('otp_expiry', None)
-        return redirect(url_for('login'))
-    else:
+    if user_otp != stored_otp:
         return "Invalid OTP ❌"
+
+    # ✅ OTP correct → NOW SAVE USER IN DB
+
+    username = session['username']
+    email = session['email']
+    password = session['password']
+
+    conn = sqlite3.connect('database/auction.db')
+    cur = conn.cursor()
+
+    # check if user already exists
+    cur.execute("SELECT * FROM users WHERE username=?", (username,))
+    existing = cur.fetchone()
+
+    if existing:
+        conn.close()
+        return "User already exists ❌"
+
+    # insert user
+    cur.execute("""
+    INSERT INTO users (username, email, password)
+    VALUES (?, ?, ?)
+    """, (username, email, password))
+
+    conn.commit()
+    conn.close()
+
+    # clear session OTP
+    session.pop('otp', None)
+
+    return redirect('/login')
 
 @app.route('/verify_page')
 def verify_page():
@@ -659,12 +747,31 @@ def admin_suspicious():
 
 import sqlite3
 
-conn = sqlite3.connect("database/auction.db")
+conn = sqlite3.connect('database/auction.db')
 cur = conn.cursor()
 
-cur.execute("INSERT INTO users (username,password) VALUES ('admin','admin123')")
+cur.execute("SELECT id, highest_bidder FROM auctions")
+rows = cur.fetchall()
 
-conn.commit()
+for row in rows:
+    print(row)
+
+conn.close()
+
+
+
+
+import sqlite3
+
+conn = sqlite3.connect('database/auction.db')
+cur = conn.cursor()
+
+cur.execute("PRAGMA table_info(auctions);")
+columns = cur.fetchall()
+
+for col in columns:
+    print(col)
+
 conn.close()
 
 # ---------------- RUN ---------------- #
